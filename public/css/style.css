@@ -70,7 +70,7 @@ a:active {
 .site-header {
   max-width: 1150px;
   margin: 28px auto 0;
-  padding: 18px 28px;
+  padding: 14px 28px;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -83,15 +83,21 @@ a:active {
 }
 
 .site-title {
-  font-size: 1.6rem;
-  font-weight: 600;
-  color: #7371fc;
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
   transition: transform 0.15s ease;
 }
 
 .site-title:hover {
-  transform: scale(1.08);
+  transform: scale(1.05);
+}
+
+.site-logo {
+  display: block;
+  height: 88px;
+  width: auto;
+  border-radius: 16px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.12);
 }
 
 .site-nav {
