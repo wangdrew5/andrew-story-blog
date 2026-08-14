@@ -3,7 +3,13 @@
 
 const BLOG_TYPE = window.BLOG_TYPE;
 const CREATOR_LABEL = BLOG_TYPE === 'book' ? 'Author' : 'Director';
+const AUTHORS = [
+  { key: 'andrew', label: 'Andrew' },
+  { key: 'ethan', label: 'Ethan' },
+];
+let currentAuthor = 'andrew';
 let isAdmin = false;
+let loggedInUsername = null;
 
 function escapeHTML(str) {
   const div = document.createElement('div');
@@ -75,9 +81,38 @@ function renderPost(post) {
   `;
 }
 
+function renderAuthorTabs() {
+  const tabsEl = document.getElementById('author-tabs');
+  if (!tabsEl) return;
+  tabsEl.innerHTML = AUTHORS.map(
+    (a) => `<button type="button" class="author-tab${a.key === currentAuthor ? ' active' : ''}" data-author="${a.key}">${a.label}</button>`
+  ).join('');
+  tabsEl.querySelectorAll('.author-tab').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      if (btn.dataset.author === currentAuthor) return;
+      currentAuthor = btn.dataset.author;
+      tabsEl.querySelectorAll('.author-tab').forEach((b) => b.classList.remove('active'));
+      btn.classList.add('active');
+      updateAdminPanelVisibility();
+      loadPosts();
+    });
+  });
+}
+
+function updateAdminPanelVisibility() {
+  const panel = document.getElementById('admin-panel');
+  if (!panel) return;
+  if (isAdmin && loggedInUsername === currentAuthor) {
+    renderAdminForm();
+  } else {
+    panel.style.display = 'none';
+    panel.innerHTML = '';
+  }
+}
+
 async function loadPosts() {
   const container = document.getElementById('posts-container');
-  const res = await fetch(`/api/posts?type=${BLOG_TYPE}`);
+  const res = await fetch(`/api/posts?type=${BLOG_TYPE}&author=${currentAuthor}`);
   const posts = await res.json();
 
   if (posts.length === 0) {
@@ -162,10 +197,22 @@ function renderAdminForm() {
   document.getElementById('new-post-form').addEventListener('submit', async (e) => {
     e.preventDefault();
     const form = e.target;
-    const formData = new FormData(form);
-    formData.append('type', BLOG_TYPE);
     const errorEl = document.getElementById('new-post-error');
     errorEl.textContent = '';
+
+    // Vercel serverless functions reject request bodies over ~4.5MB at the
+    // platform level, before our code ever runs, which surfaces to the
+    // browser as a bare connection-closed error rather than a normal 4xx.
+    // Catch oversized photos here so the admin gets an actual message.
+    const photoFile = form.elements.photo.files[0];
+    const MAX_PHOTO_BYTES = 4 * 1024 * 1024;
+    if (photoFile && photoFile.size > MAX_PHOTO_BYTES) {
+      errorEl.textContent = `Photo is too large (${(photoFile.size / (1024 * 1024)).toFixed(1)}MB). Please use an image under 4MB.`;
+      return;
+    }
+
+    const formData = new FormData(form);
+    formData.append('type', BLOG_TYPE);
     const res = await fetch('/api/posts', { method: 'POST', body: formData });
     if (!res.ok) {
       const data = await res.json().catch(() => ({}));
@@ -178,9 +225,13 @@ function renderAdminForm() {
   });
 }
 
-document.addEventListener('DOMContentLoaded', loadPosts);
-document.addEventListener('admin-ready', () => {
+document.addEventListener('DOMContentLoaded', () => {
+  renderAuthorTabs();
+  loadPosts();
+});
+document.addEventListener('admin-ready', (e) => {
   isAdmin = true;
-  renderAdminForm();
+  loggedInUsername = (e.detail && e.detail.username) || null;
+  updateAdminPanelVisibility();
   loadPosts();
 });

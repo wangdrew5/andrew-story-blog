@@ -26,8 +26,10 @@ function runInBackground(promise) {
   }
 }
 
-const DEFAULT_ADMIN_USERNAME = 'andrew';
-const DEFAULT_ADMIN_PASSWORD = 'andrew123';
+const DEFAULT_ADMINS = [
+  { username: 'andrew', password: 'andrew123', displayName: 'Andrew' },
+  { username: 'ethan', password: 'ethan123', displayName: 'Ethan' },
+];
 
 const PORT = process.env.PORT || 3000;
 const JWT_SECRET = process.env.JWT_SECRET || crypto.randomBytes(32).toString('hex');
@@ -39,18 +41,29 @@ if (!process.env.JWT_SECRET) {
   );
 }
 
-async function getOrCreateAdmin() {
-  let admin = await readData('admin', null);
-  if (!admin) {
-    const passwordHash = bcrypt.hashSync(DEFAULT_ADMIN_PASSWORD, 10);
-    admin = { username: DEFAULT_ADMIN_USERNAME, passwordHash };
-    await writeData('admin', admin);
-    console.log('Created default admin account.');
-    console.log(`  Username: ${DEFAULT_ADMIN_USERNAME}`);
-    console.log(`  Password: ${DEFAULT_ADMIN_PASSWORD}`);
-    console.log('  Change this by logging in and updating data/admin.json (or the "admin" KV key).');
+// Supports multiple named admin accounts (one per contributor) instead of a
+// single shared login, so each person's session is tied to their own
+// username and can only publish under their own author tab.
+async function getOrCreateAdmins() {
+  let admins = await readData('admins', null);
+  if (!admins) {
+    // Migrate a pre-existing single-admin record (old "admin" key) so an
+    // already-changed password isn't clobbered by the new default list.
+    const legacy = await readData('admin', null);
+    admins = DEFAULT_ADMINS.map((d) => {
+      if (legacy && legacy.username === d.username) {
+        return { username: legacy.username, passwordHash: legacy.passwordHash, displayName: d.displayName };
+      }
+      return { username: d.username, passwordHash: bcrypt.hashSync(d.password, 10), displayName: d.displayName };
+    });
+    await writeData('admins', admins);
+    console.log('Created default admin accounts (change these by logging in and updating data/admins.json, or the "admins" KV key):');
+    admins.forEach((a, i) => {
+      const carriedOver = legacy && legacy.username === a.username;
+      console.log(`  ${a.username} / ${carriedOver ? '(existing password)' : DEFAULT_ADMINS[i].password}`);
+    });
   }
-  return admin;
+  return admins;
 }
 
 function asyncHandler(fn) {
@@ -62,28 +75,39 @@ const app = express();
 app.use(express.json());
 app.use(cookieParser());
 
+// Kept in sync with MAX_PHOTO_BYTES in public/js/blog.js: Vercel serverless
+// functions reject request bodies over ~4.5MB before our code even runs, so
+// this must stay comfortably under that or oversized uploads just drop the
+// connection instead of hitting this limit.
+const MAX_PHOTO_BYTES = 4 * 1024 * 1024;
+
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 8 * 1024 * 1024 },
+  limits: { fileSize: MAX_PHOTO_BYTES },
   fileFilter: (req, file, cb) => {
     const allowed = ['.jpg', '.jpeg', '.png', '.gif', '.webp'];
     cb(null, allowed.includes(path.extname(file.originalname).toLowerCase()));
   },
 });
 
-function isAdminRequest(req) {
+function decodeAdminToken(req) {
   const token = req.cookies && req.cookies.admin_token;
-  if (!token) return false;
+  if (!token) return null;
   try {
-    jwt.verify(token, JWT_SECRET);
-    return true;
+    return jwt.verify(token, JWT_SECRET);
   } catch {
-    return false;
+    return null;
   }
 }
 
+function isAdminRequest(req) {
+  return !!decodeAdminToken(req);
+}
+
 function requireAdmin(req, res, next) {
-  if (!isAdminRequest(req)) return res.status(401).json({ error: 'Admin login required.' });
+  const payload = decodeAdminToken(req);
+  if (!payload) return res.status(401).json({ error: 'Admin login required.' });
+  req.admin = payload;
   next();
 }
 
@@ -96,11 +120,12 @@ app.post(
     if (!username || !password) {
       return res.status(400).json({ error: 'Missing credentials.' });
     }
-    const admin = await getOrCreateAdmin();
-    if (username !== admin.username || !bcrypt.compareSync(password, admin.passwordHash)) {
+    const admins = await getOrCreateAdmins();
+    const admin = admins.find((a) => a.username === username);
+    if (!admin || !bcrypt.compareSync(password, admin.passwordHash)) {
       return res.status(401).json({ error: 'Invalid username or password.' });
     }
-    const token = jwt.sign({ isAdmin: true }, JWT_SECRET, { expiresIn: '8h' });
+    const token = jwt.sign({ isAdmin: true, username: admin.username }, JWT_SECRET, { expiresIn: '8h' });
     res.cookie('admin_token', token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
@@ -117,7 +142,8 @@ app.post('/api/admin/logout', (req, res) => {
 });
 
 app.get('/api/admin/session', (req, res) => {
-  res.json({ isAdmin: isAdminRequest(req) });
+  const payload = decodeAdminToken(req);
+  res.json({ isAdmin: !!payload, username: payload ? payload.username : null });
 });
 
 // ---------- Posts (blog reviews) ----------
@@ -125,9 +151,12 @@ app.get('/api/admin/session', (req, res) => {
 app.get(
   '/api/posts',
   asyncHandler(async (req, res) => {
-    const { type } = req.query;
+    const { type, author } = req.query;
     let posts = await readData('posts', []);
     if (type) posts = posts.filter((p) => p.type === type);
+    // Posts created before multi-author support didn't have an author field;
+    // treat those as Andrew's so existing content still shows up.
+    if (author) posts = posts.filter((p) => (p.author || 'andrew') === author);
     posts.sort((a, b) => new Date(b.date) - new Date(a.date));
     res.json(posts);
   })
@@ -147,6 +176,7 @@ app.post(
     const post = {
       id: uuidv4(),
       type,
+      author: req.admin.username,
       title,
       creator,
       date,
@@ -238,7 +268,7 @@ app.get(
         '<!DOCTYPE html><html><head><meta charset="UTF-8" /><title>Unsubscribed</title></head>' +
           '<body style="font-family: Georgia, serif; text-align: center; padding: 80px 20px;">' +
           '<h1>You\'ve been unsubscribed.</h1>' +
-          '<p>You will no longer receive review notifications from Andrew\'s Story Blog.</p>' +
+          '<p>You will no longer receive review notifications from Andrew\'s Story Collective.</p>' +
           '<p><a href="/">Back to the site</a></p>' +
           '</body></html>'
       );
@@ -250,9 +280,12 @@ app.get(
 app.get(
   '/api/rankings',
   asyncHandler(async (req, res) => {
-    const { type, sort } = req.query;
+    const { type, author, sort } = req.query;
     let rankings = await readData('rankings', []);
     if (type) rankings = rankings.filter((r) => r.type === type);
+    // Entries created before multi-author support didn't have an author
+    // field; treat those as Andrew's so existing rankings still show up.
+    if (author) rankings = rankings.filter((r) => (r.author || 'andrew') === author);
     if (sort === 'rating') {
       rankings.sort((a, b) => b.rating - a.rating);
     } else {
@@ -278,6 +311,7 @@ app.post(
     const entry = {
       id: uuidv4(),
       type,
+      author: req.admin.username,
       title,
       rating: numericRating,
       date: new Date().toISOString(),
@@ -321,11 +355,11 @@ app.post(
       return res.status(400).json({ error: 'Missing required fields.' });
     }
 
-    const admin = isAdminRequest(req);
+    const adminPayload = decodeAdminToken(req);
+    const admin = !!adminPayload;
     let enteredBy;
     if (admin) {
-      const adminRecord = await getOrCreateAdmin();
-      enteredBy = adminRecord.username.charAt(0).toUpperCase() + adminRecord.username.slice(1);
+      enteredBy = adminPayload.username.charAt(0).toUpperCase() + adminPayload.username.slice(1);
     } else {
       enteredBy = (req.body && req.body.enteredBy || '').trim();
       if (!enteredBy) {
@@ -379,13 +413,16 @@ app.delete(
 app.use(express.static(path.join(__dirname, 'public')));
 
 app.use((err, req, res, next) => {
+  if (err instanceof multer.MulterError && err.code === 'LIMIT_FILE_SIZE') {
+    return res.status(413).json({ error: 'Photo is too large. Please use an image under 4MB.' });
+  }
   console.error(err);
   res.status(500).json({ error: 'Internal server error.' });
 });
 
 if (!process.env.VERCEL) {
   app.listen(PORT, () => {
-    console.log(`Andrew's Story Blog running at http://localhost:${PORT}`);
+    console.log(`Andrew's Story Collective running at http://localhost:${PORT}`);
   });
 }
 

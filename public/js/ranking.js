@@ -3,8 +3,14 @@
 
 const RANKING_TYPE = window.RANKING_TYPE;
 const RANKING_LABELS = { book: 'Book', movie: 'Movie', story: 'Short story' };
+const AUTHORS = [
+  { key: 'andrew', label: 'Andrew' },
+  { key: 'ethan', label: 'Ethan' },
+];
 let currentSort = 'recency';
+let currentAuthor = 'andrew';
 let isAdmin = false;
+let loggedInUsername = null;
 
 function escapeHTML(str) {
   const div = document.createElement('div');
@@ -47,9 +53,38 @@ function renderRankings(entries) {
 }
 
 async function loadRankings() {
-  const res = await fetch(`/api/rankings?type=${RANKING_TYPE}&sort=${currentSort}`);
+  const res = await fetch(`/api/rankings?type=${RANKING_TYPE}&author=${currentAuthor}&sort=${currentSort}`);
   const entries = await res.json();
   renderRankings(entries);
+}
+
+function renderAuthorTabs() {
+  const tabsEl = document.getElementById('author-tabs');
+  if (!tabsEl) return;
+  tabsEl.innerHTML = AUTHORS.map(
+    (a) => `<button type="button" class="author-tab${a.key === currentAuthor ? ' active' : ''}" data-author="${a.key}">${a.label}</button>`
+  ).join('');
+  tabsEl.querySelectorAll('.author-tab').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      if (btn.dataset.author === currentAuthor) return;
+      currentAuthor = btn.dataset.author;
+      tabsEl.querySelectorAll('.author-tab').forEach((b) => b.classList.remove('active'));
+      btn.classList.add('active');
+      updateAdminPanelVisibility();
+      loadRankings();
+    });
+  });
+}
+
+function updateAdminPanelVisibility() {
+  const panel = document.getElementById('admin-panel');
+  if (!panel) return;
+  if (isAdmin && loggedInUsername === currentAuthor) {
+    renderAdminForm();
+  } else {
+    panel.style.display = 'none';
+    panel.innerHTML = '';
+  }
 }
 
 function setupSortButtons() {
@@ -106,11 +141,13 @@ function renderAdminForm() {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
+  renderAuthorTabs();
   setupSortButtons();
   loadRankings();
 });
-document.addEventListener('admin-ready', () => {
+document.addEventListener('admin-ready', (e) => {
   isAdmin = true;
-  renderAdminForm();
+  loggedInUsername = (e.detail && e.detail.username) || null;
+  updateAdminPanelVisibility();
   loadRankings();
 });

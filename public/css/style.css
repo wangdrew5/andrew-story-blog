@@ -224,6 +224,39 @@ a:active {
   color: #2c2c54;
 }
 
+/* Author tabs (Books/Movies/Rankings pages) */
+
+.author-tabs {
+  max-width: 780px;
+  margin: 0 auto 24px;
+  padding: 0 24px;
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+}
+
+.author-tab {
+  padding: 10px 24px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  background: rgba(255, 255, 255, 0.25);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  font-size: 1.05rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.author-tab:hover {
+  background: rgba(255, 255, 255, 0.55);
+}
+
+.author-tab.active {
+  background: rgba(115, 113, 252, 0.35);
+  border-color: rgba(115, 113, 252, 0.5);
+}
+
 /* Blog posts */
 
 .posts {

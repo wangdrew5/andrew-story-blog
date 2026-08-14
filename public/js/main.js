@@ -13,8 +13,7 @@ function highlightActiveNav() {
 
 async function getAdminSession() {
   const res = await fetch('/api/admin/session');
-  const data = await res.json();
-  return data.isAdmin;
+  return res.json();
 }
 
 function buildLoginModal() {
@@ -114,10 +113,10 @@ function renderAdminBar() {
 document.addEventListener('DOMContentLoaded', async () => {
   highlightActiveNav();
   setupSecretLoginTrigger();
-  const isAdmin = await getAdminSession();
-  if (isAdmin) {
+  const session = await getAdminSession();
+  if (session.isAdmin) {
     renderAdminBar();
     document.body.classList.add('is-admin');
-    document.dispatchEvent(new CustomEvent('admin-ready'));
+    document.dispatchEvent(new CustomEvent('admin-ready', { detail: { username: session.username } }));
   }
 });
