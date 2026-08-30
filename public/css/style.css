@@ -496,6 +496,36 @@ input, textarea, select, button {
   font-size: 0.8rem;
 }
 
+/* Mailing list admin */
+
+.subscriber-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 420px;
+  overflow-y: auto;
+}
+
+.subscriber-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  background: rgba(255, 255, 255, 0.55);
+  border-radius: 12px;
+  cursor: pointer;
+}
+
+.subscriber-row .subscriber-email {
+  flex: 1;
+}
+
+.subscriber-row .subscriber-date {
+  flex-shrink: 0;
+  color: #999;
+  font-size: 0.85rem;
+}
+
 /* Ranking table */
 
 .ranking-controls {

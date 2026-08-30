@@ -189,7 +189,11 @@ app.post(
     await writeData('posts', posts);
     res.status(201).json(post);
 
-    const subscribers = await readData('subscribers', []);
+    const allSubscribers = await readData('subscribers', []);
+    // Each admin can opt individual subscribers out of their own posts (see
+    // the mailing-list endpoints below), so only notify subscribers the
+    // posting admin hasn't excluded.
+    const subscribers = allSubscribers.filter((s) => !(s.excludedBy || []).includes(post.author));
     const baseUrl = `${req.protocol}://${req.get('host')}`;
     runInBackground(notifySubscribers({ subscribers, post, baseUrl }));
   })
@@ -272,6 +276,47 @@ app.get(
           '<p><a href="/">Back to the site</a></p>' +
           '</body></html>'
       );
+  })
+);
+
+// Lets each admin see the mailing list and opt individual subscribers out of
+// *their own* future posts, without affecting whether other admins' posts
+// reach that subscriber (e.g. Ethan can exclude Bob while Andrew still
+// includes him).
+app.get(
+  '/api/admin/mailing-list',
+  requireAdmin,
+  asyncHandler(async (req, res) => {
+    const subscribers = await readData('subscribers', []);
+    const list = subscribers
+      .map((s) => ({
+        id: s.id,
+        email: s.email,
+        createdAt: s.createdAt,
+        excluded: (s.excludedBy || []).includes(req.admin.username),
+      }))
+      .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+    res.json(list);
+  })
+);
+
+app.post(
+  '/api/admin/mailing-list/:id/toggle-exclude',
+  requireAdmin,
+  asyncHandler(async (req, res) => {
+    const subscribers = await readData('subscribers', []);
+    const subscriber = subscribers.find((s) => s.id === req.params.id);
+    if (!subscriber) return res.status(404).json({ error: 'Subscriber not found.' });
+
+    subscriber.excludedBy = subscriber.excludedBy || [];
+    const idx = subscriber.excludedBy.indexOf(req.admin.username);
+    if (idx === -1) {
+      subscriber.excludedBy.push(req.admin.username);
+    } else {
+      subscriber.excludedBy.splice(idx, 1);
+    }
+    await writeData('subscribers', subscribers);
+    res.json({ id: subscriber.id, excluded: idx === -1 });
   })
 );
 
