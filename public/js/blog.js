@@ -53,7 +53,7 @@ function renderPost(post) {
     ? `<img class="post-photo" src="${post.photo}" alt="${escapeHTML(post.title)}" />`
     : '';
   const comments = post.comments.map(renderComment).join('') ||
-    '<p style="color:#999;font-size:0.9rem;">No comments yet.</p>';
+    '<p class="no-comments">No comments yet.</p>';
 
   const deleteButton = isAdmin
     ? `<button type="button" class="delete-btn delete-post-btn">Delete</button>`
@@ -66,14 +66,14 @@ function renderPost(post) {
         <h2 class="post-title">${escapeHTML(post.title)}</h2>
         ${deleteButton}
       </div>
-      <div class="post-meta">${CREATOR_LABEL}: ${escapeHTML(post.creator)} &middot; ${formatDate(post.date)}</div>
+      <div class="post-meta"><span class="post-creator">${CREATOR_LABEL}: ${escapeHTML(post.creator)}</span><span class="meta-sep" aria-hidden="true">&middot;</span><time class="post-date">${formatDate(post.date)}</time></div>
       <div class="post-review">${renderReviewWithSpoilers(post.review)}</div>
       <div class="comments">
         <h4>Comments</h4>
         <div class="comment-list">${comments}</div>
         <form class="comment-form">
-          <input type="text" name="name" placeholder="Your name" required style="flex:1;padding:8px 12px;border-radius:8px;border:1px solid #ddd;min-width:120px;" />
-          <input type="text" name="text" placeholder="Say something..." required style="flex:3;padding:8px 12px;border-radius:8px;border:1px solid #ddd;min-width:180px;" />
+          <input class="comment-input" type="text" name="name" placeholder="Your name" aria-label="Your name" autocomplete="name" required />
+          <input class="comment-input" type="text" name="text" placeholder="Say something..." aria-label="Your comment" required />
           <button type="submit" class="btn">Post</button>
         </form>
       </div>

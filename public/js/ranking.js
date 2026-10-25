@@ -35,7 +35,7 @@ function renderRankings(entries) {
       (entry) => `
       <div class="ranking-row" data-entry-id="${entry.id}">
         <span class="rank-title">${escapeHTML(entry.title)}</span>
-        <span class="rank-rating">${entry.rating} / 1000</span>
+        <span class="rank-rating">${entry.rating} <small>/ 1000</small></span>
         ${isAdmin ? '<button type="button" class="delete-btn delete-rank-btn">Delete</button>' : ''}
       </div>
     `

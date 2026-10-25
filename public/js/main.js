@@ -11,6 +11,41 @@ function highlightActiveNav() {
   });
 }
 
+function setupNavToggle() {
+  const header = document.querySelector('.site-header');
+  const toggle = header && header.querySelector('.nav-toggle');
+  if (!toggle) return;
+  header.classList.add('nav-ready');
+
+  const setOpen = (open) => {
+    header.classList.toggle('nav-open', open);
+    toggle.setAttribute('aria-expanded', String(open));
+    toggle.setAttribute('aria-label', open ? 'Close menu' : 'Menu');
+  };
+
+  toggle.addEventListener('click', () => setOpen(!header.classList.contains('nav-open')));
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && header.classList.contains('nav-open')) {
+      setOpen(false);
+      toggle.focus();
+    }
+  });
+  document.addEventListener('click', (e) => {
+    if (!header.contains(e.target)) setOpen(false);
+  });
+}
+
+function renderLoginEntry() {
+  if (document.querySelector('.site-footer')) return;
+  const footer = document.createElement('footer');
+  footer.className = 'site-footer';
+  footer.innerHTML = '<button type="button" class="footer-login">Admin sign-in</button>';
+  document.body.appendChild(footer);
+  footer.querySelector('.footer-login').addEventListener('click', () => {
+    if (!document.querySelector('.modal-overlay')) buildLoginModal();
+  });
+}
+
 async function getAdminSession() {
   const res = await fetch('/api/admin/session');
   return res.json();
@@ -19,9 +54,10 @@ async function getAdminSession() {
 function buildLoginModal() {
   const overlay = document.createElement('div');
   overlay.className = 'modal-overlay';
+  const opener = document.activeElement;
   overlay.innerHTML = `
-    <div class="modal-box">
-      <h3>Admin Login</h3>
+    <div class="modal-box" role="dialog" aria-modal="true" aria-labelledby="admin-login-title">
+      <h3 id="admin-login-title">Admin Login</h3>
       <form id="admin-login-form">
         <div class="field">
           <label for="admin-username">Username</label>
@@ -31,7 +67,7 @@ function buildLoginModal() {
           <label for="admin-password">Password</label>
           <input id="admin-password" name="password" type="password" autocomplete="current-password" required />
         </div>
-        <div class="modal-error" id="admin-login-error"></div>
+        <div class="modal-error" id="admin-login-error" role="alert"></div>
         <div class="modal-actions">
           <button type="button" class="btn btn-secondary" id="admin-login-cancel">Cancel</button>
           <button type="submit" class="btn">Sign In</button>
@@ -41,9 +77,24 @@ function buildLoginModal() {
   `;
   document.body.appendChild(overlay);
 
-  overlay.querySelector('#admin-login-cancel').addEventListener('click', () => overlay.remove());
+  const close = () => {
+    overlay.remove();
+    document.removeEventListener('keydown', onKey);
+    if (opener && opener.focus) opener.focus();
+  };
+  const onKey = (e) => {
+    if (e.key === 'Escape') close();
+  };
+  document.addEventListener('keydown', onKey);
+  overlay.querySelector('#admin-login-cancel').addEventListener('click', close);
   overlay.addEventListener('click', (e) => {
-    if (e.target === overlay) overlay.remove();
+    if (e.target === overlay) close();
+  });
+  // With the on-screen keyboard open, keep the focused field in view.
+  overlay.querySelectorAll('input').forEach((input) => {
+    input.addEventListener('focus', () => {
+      setTimeout(() => input.scrollIntoView({ block: 'center', behavior: 'smooth' }), 300);
+    });
   });
 
   overlay.querySelector('#admin-login-form').addEventListener('submit', async (e) => {
@@ -64,6 +115,7 @@ function buildLoginModal() {
         return;
       }
       overlay.remove();
+      document.removeEventListener('keydown', onKey);
       window.location.reload();
     } catch (err) {
       errorEl.textContent = 'Something went wrong.';
@@ -112,9 +164,12 @@ function renderAdminBar() {
 
 document.addEventListener('DOMContentLoaded', async () => {
   highlightActiveNav();
+  setupNavToggle();
   setupSecretLoginTrigger();
-  const session = await getAdminSession();
+  const session = await getAdminSession().catch(() => ({ isAdmin: false }));
+  if (!session.isAdmin) renderLoginEntry();
   if (session.isAdmin) {
+    document.querySelector('.site-footer')?.remove();
     renderAdminBar();
     document.body.classList.add('is-admin');
     document.dispatchEvent(new CustomEvent('admin-ready', { detail: { username: session.username } }));

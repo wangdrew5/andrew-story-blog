@@ -17,15 +17,19 @@ function categoryLabel(category) {
 function renderEntry(entry) {
   const adminButtons = isAdmin
     ? `
-      <button type="button" class="delete-btn toggle-complete-btn">${entry.completed ? 'Mark unfinished' : 'Mark finished'}</button>
-      <button type="button" class="delete-btn delete-future-btn">Delete</button>
+      <div class="row-actions">
+        <button type="button" class="delete-btn toggle-complete-btn">${entry.completed ? 'Mark unfinished' : 'Mark finished'}</button>
+        <button type="button" class="delete-btn delete-future-btn">Delete</button>
+      </div>
     `
     : '';
   return `
     <div class="ranking-row future-row" data-entry-id="${entry.id}">
       <span class="rank-rating future-category">${categoryLabel(entry.category)}</span>
-      <span class="rank-title${entry.completed ? ' future-completed' : ''}">${escapeHTML(entry.title)}</span>
-      <span class="future-entered-by">added by ${escapeHTML(entry.enteredBy)}</span>
+      <div class="rank-main">
+        <span class="rank-title${entry.completed ? ' future-completed' : ''}">${escapeHTML(entry.title)}</span>
+        <span class="future-entered-by">added by ${escapeHTML(entry.enteredBy)}</span>
+      </div>
       ${adminButtons}
     </div>
   `;

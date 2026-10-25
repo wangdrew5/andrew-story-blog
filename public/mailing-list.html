@@ -14,7 +14,8 @@
 
   <header class="site-header">
     <a class="site-title" href="index.html"><img class="site-logo" src="/img/logo.png" alt="Andrew's Story Collective" /></a>
-    <nav class="site-nav">
+    <button type="button" class="nav-toggle" aria-expanded="false" aria-controls="site-nav" aria-label="Menu"><span class="nav-toggle-bars" aria-hidden="true"></span></button>
+    <nav class="site-nav" id="site-nav" aria-label="Main">
       <a class="nav-pill" href="books.html">Books</a>
       <a class="nav-pill" href="movies.html">Movies</a>
       <a class="nav-pill" href="short-stories-ranking.html">Short Stories</a>
@@ -42,7 +43,7 @@
 
   <div class="admin-panel" id="mailing-list-admin" style="display:none;">
     <h3>Mailing list</h3>
-    <p style="margin-top:-6px;color:#555;font-size:0.9rem;">
+    <p class="admin-note">
       Uncheck someone to stop sending them an email when <em>you</em> post a new review.
       Other admins' subscriptions to them aren't affected.
     </p>

@@ -270,6 +270,13 @@ document.addEventListener('DOMContentLoaded', () => {
   const canvas = document.getElementById('mesh-gradient-canvas');
   if (!canvas) return;
 
+  // Phones (and anyone who asked for less motion) get the quiet static CSS
+  // background instead of the animated WebGL canvas.
+  if (window.matchMedia('(max-width: 640px), (prefers-reduced-motion: reduce)').matches) {
+    canvas.style.display = 'none';
+    return;
+  }
+
   const result = createMeshGradient(canvas, {
     colors: ['#a40e4c', '#91efb1', '#7371fc', '#abe6e6', '#ff8aa6', '#92caa5'],
     numPoints: 6,
