@@ -30,17 +30,27 @@ function renderRankings(entries) {
     container.innerHTML = '<p class="empty-state">No entries yet.</p>';
     return;
   }
+  const canTag = RANKING_TYPE === 'movie' && isAdmin && loggedInUsername === currentAuthor && window.MovieProfile;
   container.innerHTML = entries
     .map(
       (entry) => `
       <div class="ranking-row" data-entry-id="${entry.id}">
         <span class="rank-title">${escapeHTML(entry.title)}</span>
         <span class="rank-rating">${entry.rating} <small>/ 1000</small></span>
+        ${canTag ? `<button type="button" class="delete-btn tag-btn${entry.profile ? '' : ' untagged'}">${entry.profile ? 'Edit tags' : 'Tag'}</button>` : ''}
         ${isAdmin ? '<button type="button" class="delete-btn delete-rank-btn">Delete</button>' : ''}
       </div>
     `
     )
     .join('');
+
+  container.querySelectorAll('.tag-btn').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const entryId = btn.closest('.ranking-row').dataset.entryId;
+      const entry = entries.find((e) => e.id === entryId);
+      if (entry) openTagModal(entry);
+    });
+  });
 
   container.querySelectorAll('.delete-rank-btn').forEach((btn) => {
     btn.addEventListener('click', async () => {
@@ -50,6 +60,122 @@ function renderRankings(entries) {
       if (res.ok) loadRankings();
     });
   });
+}
+
+// Lets an admin tag a watched movie with the traits the movie suggester
+// (movie-suggester.html) matches on.
+function openTagModal(entry) {
+  const MP = window.MovieProfile;
+  const p = entry.profile || {};
+  const chips = (name, options, selected) =>
+    options
+      .map(
+        (o) => `<label class="chip"><input type="checkbox" name="${name}" value="${o}"${(selected || []).includes(o) ? ' checked' : ''} /><span>${o}</span></label>`
+      )
+      .join('');
+  const scale = (name, ends, value) => `
+    <input id="tag-${name}" name="${name}" type="range" min="${MP.SCALE_MIN}" max="${MP.SCALE_MAX}" step="1" value="${value || 5}" />
+    <div class="scale-ends"><span>${ends[0]}</span><output id="tag-${name}-value">${value || 5}</output><span>${ends[1]}</span></div>`;
+
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay';
+  const opener = document.activeElement;
+  overlay.innerHTML = `
+    <div class="modal-box modal-wide" role="dialog" aria-modal="true" aria-labelledby="tag-title">
+      <h3 id="tag-title">Tag “${escapeHTML(entry.title)}”</h3>
+      <p class="admin-note">These tags power the movie suggester.</p>
+      <form id="tag-form">
+        <fieldset class="field">
+          <legend>Genres</legend>
+          <div class="chip-group">${chips('genres', MP.GENRES, p.genres)}</div>
+        </fieldset>
+        <fieldset class="field">
+          <legend>Moods</legend>
+          <div class="chip-group">${chips('moods', MP.MOODS, p.moods)}</div>
+        </fieldset>
+        <div class="field">
+          <label for="tag-runtime">Runtime (minutes)</label>
+          <input id="tag-runtime" name="runtime" type="number" min="1" max="1000" step="1" value="${p.runtime || ''}" required />
+        </div>
+        <div class="field">
+          <label for="tag-beauty">Beauty style</label>
+          ${scale('beauty', MP.BEAUTY_ENDS, p.beauty)}
+        </div>
+        <div class="field">
+          <label for="tag-cortisol">Cortisol</label>
+          ${scale('cortisol', MP.CORTISOL_ENDS, p.cortisol)}
+        </div>
+        <div class="field">
+          <label for="tag-lasting">Lasting effect</label>
+          <select id="tag-lasting" name="lasting" required>
+            <option value="">Choose…</option>
+            ${MP.LASTING.map((l) => `<option value="${l.days}"${p.lasting === l.days ? ' selected' : ''}>${l.label}</option>`).join('')}
+          </select>
+        </div>
+        <div class="modal-error" id="tag-error" role="alert"></div>
+        <div class="modal-actions">
+          <button type="button" class="btn btn-secondary" id="tag-cancel">Cancel</button>
+          <button type="submit" class="btn">Save tags</button>
+        </div>
+      </form>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+
+  const close = () => {
+    overlay.remove();
+    document.removeEventListener('keydown', onKey);
+    if (opener && opener.focus) opener.focus();
+  };
+  const onKey = (e) => {
+    if (e.key === 'Escape') close();
+  };
+  document.addEventListener('keydown', onKey);
+  overlay.querySelector('#tag-cancel').addEventListener('click', close);
+  overlay.addEventListener('click', (e) => {
+    if (e.target === overlay) close();
+  });
+  ['beauty', 'cortisol'].forEach((name) => {
+    const input = overlay.querySelector(`#tag-${name}`);
+    const out = overlay.querySelector(`#tag-${name}-value`);
+    input.addEventListener('input', () => (out.textContent = input.value));
+  });
+
+  overlay.querySelector('#tag-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const form = e.target;
+    const checked = (name) => [...form.querySelectorAll(`input[name="${name}"]:checked`)].map((i) => i.value);
+    const body = {
+      genres: checked('genres'),
+      moods: checked('moods'),
+      runtime: Number(form.runtime.value),
+      beauty: Number(form.beauty.value),
+      cortisol: Number(form.cortisol.value),
+      lasting: Number(form.lasting.value),
+    };
+    const errorEl = overlay.querySelector('#tag-error');
+    errorEl.textContent = '';
+    try {
+      MP.sanitizeProfile(body);
+    } catch (err) {
+      errorEl.textContent = err.message;
+      return;
+    }
+    const res = await fetch(`/api/rankings/${entry.id}/profile`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      errorEl.textContent = data.error || 'Failed to save tags.';
+      return;
+    }
+    close();
+    loadRankings();
+  });
+
+  overlay.querySelector('input[name="genres"]').focus();
 }
 
 async function loadRankings() {

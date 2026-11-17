@@ -11,6 +11,7 @@ const { readData, writeData } = require('./lib/store');
 const { savePhoto } = require('./lib/photoStorage');
 const { notifySubscribers, sendWelcomeEmail } = require('./lib/mailer');
 const { waitUntil } = require('@vercel/functions');
+const MovieProfile = require('./public/js/movie-profile');
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -364,6 +365,31 @@ app.post(
     rankings.push(entry);
     await writeData('rankings', rankings);
     res.status(201).json(entry);
+  })
+);
+
+// Tags a watched movie with the traits the movie suggester matches on
+// (genre, length, mood, beauty style, cortisol, lasting effect).
+app.put(
+  '/api/rankings/:id/profile',
+  requireAdmin,
+  asyncHandler(async (req, res) => {
+    const rankings = await readData('rankings', []);
+    const entry = rankings.find((r) => r.id === req.params.id);
+    if (!entry) return res.status(404).json({ error: 'Ranking entry not found.' });
+    if (entry.type !== 'movie') return res.status(400).json({ error: 'Only movies can be tagged.' });
+    if ((entry.author || 'andrew') !== req.admin.username) {
+      return res.status(403).json({ error: 'You can only tag movies on your own list.' });
+    }
+    let profile;
+    try {
+      profile = MovieProfile.sanitizeProfile(req.body);
+    } catch (err) {
+      return res.status(400).json({ error: err.message });
+    }
+    entry.profile = profile;
+    await writeData('rankings', rankings);
+    res.json(entry);
   })
 );
 

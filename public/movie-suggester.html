@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Movie Suggester - Andrew's Story Collective</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/css/style.css" />
+</head>
+<body class="gradient-bg">
+  <canvas id="mesh-gradient-canvas"></canvas>
+
+  <header class="site-header">
+    <a class="site-title" href="index.html"><img class="site-logo" src="/img/logo.png" alt="Andrew's Story Collective" /></a>
+    <button type="button" class="nav-toggle" aria-expanded="false" aria-controls="site-nav" aria-label="Menu"><span class="nav-toggle-bars" aria-hidden="true"></span></button>
+    <nav class="site-nav" id="site-nav" aria-label="Main">
+      <a class="nav-pill" href="books.html">Books</a>
+      <a class="nav-pill" href="movies.html">Movies</a>
+      <a class="nav-pill" href="short-stories-ranking.html">Short Stories</a>
+      <a class="nav-pill" href="mailing-list.html">EQ's Mailing List</a>
+    </nav>
+  </header>
+
+  <section class="page-heading">
+    <h1>Movie Suggester</h1>
+    <p>Say what you're in the mood for and get a pick from the list of movies watched.</p>
+  </section>
+
+  <div class="author-tabs" id="author-tabs"></div>
+
+  <div class="public-form-panel">
+    <form id="suggest-form" class="suggest-form">
+      <div class="field">
+        <label for="pref-genre">Genre</label>
+        <select id="pref-genre" name="genre"></select>
+      </div>
+      <div class="field">
+        <label for="pref-length">Length</label>
+        <select id="pref-length" name="length"></select>
+      </div>
+      <div class="field">
+        <label for="pref-mood">Mood</label>
+        <select id="pref-mood" name="mood"></select>
+      </div>
+      <div class="field">
+        <label for="pref-lasting">Lasting effect</label>
+        <select id="pref-lasting" name="lasting"></select>
+      </div>
+      <div class="field scale-field" data-scale="beauty">
+        <div class="scale-label-row">
+          <label for="pref-beauty">Beauty style</label>
+          <label class="any-toggle"><input type="checkbox" name="beauty-any" /> Any</label>
+        </div>
+        <input id="pref-beauty" name="beauty" type="range" min="1" max="10" step="1" value="5" />
+        <div class="scale-ends"><span>Gritty</span><output id="pref-beauty-value">5</output><span>Surreal</span></div>
+      </div>
+      <div class="field scale-field" data-scale="cortisol">
+        <div class="scale-label-row">
+          <label for="pref-cortisol">Cortisol</label>
+          <label class="any-toggle"><input type="checkbox" name="cortisol-any" /> Any</label>
+        </div>
+        <input id="pref-cortisol" name="cortisol" type="range" min="1" max="10" step="1" value="3" />
+        <div class="scale-ends"><span>Chill</span><output id="pref-cortisol-value">3</output><span>Scary / violent af</span></div>
+      </div>
+      <div class="suggest-actions">
+        <button type="submit" class="btn">Suggest a movie</button>
+      </div>
+    </form>
+  </div>
+
+  <section class="suggest-result" id="suggest-result" aria-live="polite"></section>
+
+  <script src="/js/movie-profile.js"></script>
+  <script src="/js/main.js"></script>
+  <script src="/js/suggester.js"></script>
+  <script src="/js/mesh-gradient.js"></script>
+</body>
+</html>
